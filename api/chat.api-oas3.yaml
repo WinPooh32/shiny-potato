@@ -1,0 +1,226 @@
+openapi: 3.0.0
+info:
+  title: IdeaChat API
+  description: Primitive chat app api.
+  version: 0.1.0
+servers:
+  - url: http://192.168.0.15:8080
+
+paths:
+  /user/name/{username}:
+    head:
+      operationId: isNameValid
+      summary: Check username is taken or not.
+      security: [] # no authentication
+      parameters:
+        - $ref: "#/components/parameters/usernameParam"
+      responses:
+        "200":
+          description: Username is free.
+        "409":
+          description: Username is taken.
+        "400":
+          description: Name length is less than 2 chars.
+        "500":
+          description: Internal server error.
+
+  /auth:
+    post:
+      operationId: authByPassword
+      summary: Authenticate by username and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/API_Key"
+
+  /send:
+    post:
+      operationId: sendMessage
+      summary: Send new message to chat room.
+      requestBody:
+        required: true
+        description: A JSON object containing the login and password.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Message"
+      security:
+        - myKey: []
+      responses:
+        "200":
+          description: ok
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /user/profile/{username}:
+    parameters:
+      - $ref: "#/components/parameters/usernameParam"
+    put:
+      operationId: setProfileInfo
+      summary: Set user profile info.
+      security:
+        - myKey: []
+      responses:
+        "200":
+          description: ok.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      operationId: getProfileInfo
+      summary: Get user profile info.
+      security:
+        - myKey: []
+      responses:
+        "200":
+          description: ok.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # Server-sent events for incoming messages
+  # Can not be done by code generator
+  /subscribe/messages:
+    get:
+      summary: Subscribe to server events of new messages.
+      security:
+        - myKey: []
+      responses:
+        "200":
+          description: server-sent events finished successfully.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    myKey:
+      type: apiKey
+      name: api_key
+      in: query
+
+  parameters:
+    usernameParam:
+      name: username
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 32
+
+  responses:
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    # Schema for error response body
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+    RoomHash:
+      type: string
+      minLength: 8
+      maxLength: 8
+
+    Username:
+      type: string
+      minLength: 2
+      maxLength: 32
+
+    Password:
+      type: string
+      minLength: 10
+      maxLength: 32
+
+    Email:
+      type: string
+      minLength: 6
+      maxLength: 254
+      pattern: '^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$'
+
+    API_Key:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 16
+          minLength: 16
+      required:
+        - key
+
+    AuthBody:
+      type: object
+      properties:
+        email:
+          $ref: "#/components/schemas/Email"
+        password:
+          $ref: "#/components/schemas/Password"
+      required:
+        - email
+        - password
+
+    SignBody:
+      type: object
+      properties:
+        username:
+          $ref: "#/components/schemas/Username"
+        password:
+          $ref: "#/components/schemas/Password"
+        email:
+          $ref: "#/components/schemas/Email"
+      required:
+        - username
+        - password
+        - email
+
+    UserProfile:
+      type: object
+      properties:
+        username:
+          $ref: "#/components/schemas/Username"
+        email:
+          $ref: "#/components/schemas/Email"
+        description:
+          $ref: "#/components/schemas/Message"
+        status:
+          type: string
+          minLength: 1
+          maxLength: 64
+
+    Message:
+      type: object
+      properties:
+        room:
+          $ref: "#/components/schemas/RoomHash"
+        payload:
+          type: string
+          minLength: 1
+          maxLength: 512
+      required:
+        - room
+        - payload
